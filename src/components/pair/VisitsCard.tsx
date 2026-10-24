@@ -5,7 +5,6 @@ import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Pill } from '@/components/ui/Pill'
 import { formatCountdown } from '@/lib/format'
-import type { Visit } from '@/types'
 import { useAuthStore } from '@/store/authStore'
 import { useVisitStore } from '@/store/visitStore'
 
@@ -14,12 +13,6 @@ function formatDateTime(iso: string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   })
-}
-
-function toLocalInput(iso: string): string {
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 export function VisitsCard() {
@@ -84,7 +77,9 @@ export function VisitsCard() {
       await requestCancel(id, undefined)
       setPendingCancelId(null)
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Could not request cancel.')
+      setActionError(
+        err instanceof Error ? err.message : 'Could not request cancel.',
+      )
     } finally {
       setSubmitting(false)
     }
@@ -229,7 +224,6 @@ export function VisitsCard() {
             const isPast =
               v.status === 'scheduled' &&
               new Date(v.scheduledAt).getTime() < Date.now()
-            const iAmRequester = v.cancelRequestedBy === user.id
             const iCanApprove =
               v.status === 'cancel_pending' && v.cancelRequestedBy !== user.id
             const iCanWithdraw =

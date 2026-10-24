@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '@/lib/api'
+import { apiGet } from '@/lib/api'
 import type { Couple } from '@/types'
 
 export const coupleService = {
@@ -11,7 +11,6 @@ export const coupleService = {
     nextVisitAt?: string | null
     distanceKm?: number | null
   }): Promise<Couple> {
-    // PATCH helper — inline since api.ts only has GET/POST
     const res = await fetch(
       `${import.meta.env.VITE_API_URL ?? 'http://localhost:4000'}/couple`,
       {
