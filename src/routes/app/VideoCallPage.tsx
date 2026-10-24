@@ -1,11 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Copy, Mic, MicOff, Phone, PhoneOff, Video, VideoOff } from 'lucide-react'
+import {
+  Check,
+  Copy,
+  Mic,
+  MicOff,
+  Phone,
+  PhoneOff,
+  Video,
+  VideoOff,
+} from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Pill } from '@/components/ui/Pill'
-import { timeAgo } from '@/lib/format'
 import { formatDistance, haversineKm } from '@/lib/distance'
+import { timeAgo } from '@/lib/format'
 import {
   joinRoom,
   startHost,
@@ -21,16 +31,6 @@ const DEV = import.meta.env.DEV
 export function VideoCallPage() {
   const user = useAuthStore((s) => s.user)
   const partner = user?.partner
-  const liveKm =
-    user?.latitude != null &&
-    user.longitude != null &&
-    partner?.latitude != null &&
-    partner.longitude != null
-      ? haversineKm(
-          { lat: user.latitude, lng: user.longitude },
-          { lat: partner.latitude, lng: partner.longitude },
-        )
-      : null
 
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -47,13 +47,25 @@ export function VideoCallPage() {
   const [camOn, setCamOn] = useState(true)
   const [copied, setCopied] = useState(false)
 
-  // Attach streams to video elements
+  const isPaired = Boolean(user?.couple && user.partner)
+
+  const liveKm =
+    user?.latitude != null &&
+    user.longitude != null &&
+    partner?.latitude != null &&
+    partner.longitude != null
+      ? haversineKm(
+          { lat: user.latitude, lng: user.longitude },
+          { lat: partner.latitude, lng: partner.longitude },
+        )
+      : null
+
   useEffect(() => {
     if (localVideoRef.current && localStreamRef.current) {
       localVideoRef.current.srcObject = localStreamRef.current
       void localVideoRef.current.play().catch(() => {})
     }
-  }, [phase])
+  })
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
@@ -62,7 +74,6 @@ export function VideoCallPage() {
     }
   }, [remoteStream])
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       sessionRef.current?.stop()
@@ -71,24 +82,6 @@ export function VideoCallPage() {
       localStreamRef.current = null
     }
   }, [])
-
-  // Keep the pairing check inside the component and after all hooks.
-  const isPaired = Boolean(user?.couple && user.partner)
-
-  if (!isPaired) {
-    return (
-      <div className="space-y-6">
-        <h2 className="text-lg font-semibold">Video call</h2>
-        <Card className="space-y-2 text-center">
-          <p className="text-3xl" aria-hidden="true">📹</p>
-          <p className="font-semibold">Pair first to call</p>
-          <p className="text-sm text-muted">
-            Find your partner's code in /app/pair.
-          </p>
-        </Card>
-      </div>
-    )
-  }
 
   const requestLocalStream = async (): Promise<MediaStream> => {
     if (localStreamRef.current) return localStreamRef.current
@@ -201,6 +194,21 @@ export function VideoCallPage() {
     }
   }
 
+  if (!user) return null
+
+  if (!isPaired) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-lg font-semibold">Video call</h2>
+        <EmptyState
+          emoji="📹"
+          title="Pair first to call"
+          hint="Find your partner's code in /app/pair."
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5">
       <h2 className="text-lg font-semibold">Video call</h2>
@@ -225,22 +233,18 @@ export function VideoCallPage() {
               {partner?.firstName ?? 'Your person'}
             </p>
             <p className="text-xs text-muted">
-  {partner?.city}
-  {liveKm != null ? ` · ${formatDistance(liveKm)} away` : ''}
-</p>
+              {partner?.city}
+              {liveKm != null ? ` · ${formatDistance(liveKm)} away` : ''}
+            </p>
             <p className="mt-1 text-xs text-muted">
               {partner ? `Last seen ${timeAgo(partner.lastSeenAt)}` : 'Waiting…'}
             </p>
           </div>
 
           <div className="flex justify-center gap-2">
-            <Pill tone={partner ? 'forest' : 'neutral'}>
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  partner ? 'bg-accent' : 'bg-muted'
-                }`}
-              />
-              {partner ? 'Ready to call' : 'Offline'}
+            <Pill tone="forest">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+              Ready to call
             </Pill>
           </div>
 
@@ -264,12 +268,7 @@ export function VideoCallPage() {
                   if (e.key === 'Enter') void join()
                 }}
               />
-              <Button
-                variant="outline"
-                onClick={() => void join()}
-                loading={busy}
-                disabled={busy}
-              >
+              <Button variant="outline" onClick={() => void join()} loading={busy}>
                 Join
               </Button>
             </div>
@@ -308,14 +307,6 @@ export function VideoCallPage() {
               <p className="text-sm text-muted">Calling room {roomCode}</p>
             </>
           )}
-
-          <div className="mx-auto w-fit">
-            <Avatar
-              name={user ? `${user.firstName} ${user.lastName}` : 'You'}
-              size="md"
-            />
-          </div>
-          <p className="text-xs text-muted">You</p>
 
           <div className="relative aspect-video w-full overflow-hidden rounded-card bg-black">
             <video
