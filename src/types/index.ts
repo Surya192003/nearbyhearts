@@ -44,6 +44,13 @@ export type SignUpPayload = {
   city?: string
 }
 
+export type InviteCode = {
+  code: string
+  expiresAt: string
+}
+
+
+
 export type VisitStatus =
   | 'scheduled'
   | 'cancel_pending'
