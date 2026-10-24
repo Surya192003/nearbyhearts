@@ -11,19 +11,20 @@ import { HomePage } from '@/routes/public/HomePage'
 import { LoginPage } from '@/routes/public/LoginPage'
 import { NotFoundPage } from '@/routes/public/NotFoundPage'
 import { PhotoboothPage as PublicPhotoboothPage } from '@/routes/public/PhotoboothPage'
-import { ThankYouPage } from '@/routes/public/ThankYouPage'
 import { PrivacyPage } from '@/routes/public/PrivacyPage'
+import { ThankYouPage } from '@/routes/public/ThankYouPage'
 
 export const router = createBrowserRouter([
   {
     element: <PublicLayout />,
-    errorElement: <NotFoundPage />, // still used — for uncaught render errors only
+    errorElement: <NotFoundPage />,
     children: [
       { path: '/', element: <HomePage /> },
       { path: '/login', element: <LoginPage /> },
       { path: '/donate/:code?', element: <DonatePage /> },
       { path: '/thank-you', element: <ThankYouPage /> },
       { path: '/photobooth', element: <PublicPhotoboothPage /> },
+      { path: '/privacy', element: <PrivacyPage /> },   // ← moved here
     ],
   },
   {
@@ -36,12 +37,8 @@ export const router = createBrowserRouter([
       { path: 'video', element: <VideoCallPage /> },
       { path: 'gifts', element: <GiftsPage /> },
       { path: 'photobooth', element: <AppPhotoboothPage /> },
-      { path: '/privacy', element: <PrivacyPage /> },
-      // Unknown /app/* paths → dashboard. AppShell's guard redirects
-      // unauthenticated users on to /login, so this always lands sensibly.
       { path: '*', element: <Navigate to="/app/whats-new" replace /> },
     ],
   },
-  // Unknown top-level paths → home page
   { path: '*', element: <Navigate to="/" replace /> },
 ])
