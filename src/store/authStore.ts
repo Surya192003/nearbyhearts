@@ -15,25 +15,29 @@ type State = {
   signOut: () => Promise<void>
 }
 
-export const useAuthStore = create<State>((set) => ({
+export const useAuthStore = create<State>((set, get) => ({
   user: null,
   status: 'idle',
   error: null,
 
   async hydrate() {
-    if (useAuthStore.getState().status !== 'idle') return
+    if (get().status !== 'idle') return
     set({ status: 'loading' })
     try {
       const user = await authService.getCurrentUser()
-      set(user ? { user, status: 'authenticated' } : { user: null, status: 'anonymous' })
+      set({ user, status: user ? 'authenticated' : 'anonymous' })
     } catch {
       set({ user: null, status: 'anonymous' })
     }
   },
 
   async refresh() {
-    const user = await authService.getCurrentUser()
-    set({ user, status: user ? 'authenticated' : 'anonymous' })
+    try {
+      const user = await authService.getCurrentUser()
+      set({ user, status: user ? 'authenticated' : 'anonymous' })
+    } catch {
+      // keep current state on failure
+    }
   },
 
   async signIn(payload) {
@@ -42,7 +46,8 @@ export const useAuthStore = create<State>((set) => ({
       const user = await authService.signIn(payload)
       set({ user, status: 'authenticated' })
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Could not sign you in.'
+      const message =
+        err instanceof Error ? err.message : 'Could not sign you in.'
       set({ status: 'anonymous', error: message })
       throw err
     }
@@ -54,7 +59,8 @@ export const useAuthStore = create<State>((set) => ({
       const user = await authService.signUp(payload)
       set({ user, status: 'authenticated' })
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Could not create account.'
+      const message =
+        err instanceof Error ? err.message : 'Could not create your account.'
       set({ status: 'anonymous', error: message })
       throw err
     }

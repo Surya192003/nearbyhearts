@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, Copy, Users } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { coupleService } from '@/services/coupleService'
 import { useAuthStore } from '@/store/authStore'
-import type { InviteCode } from '@/types'
+import { InviteCode } from '@/types'
 
 type Mode = 'pick' | 'invite' | 'join'
 
@@ -20,20 +20,35 @@ export function PartnerOnboardingPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Poll while showing an invite code. Refresh pulls fresh user data from
-  // /auth/me — no new service method needed.
+  // Poll every 5s while showing an invite code
   useEffect(() => {
-    if (!invite) return
-    const tick = async () => {
-      await refresh()
-      const partner = useAuthStore.getState().user?.partner
-      if (partner) {
-        navigate('/app/whats-new', { replace: true })
+    if (!invite) {
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
+      return
+    }
+    pollRef.current = setInterval(async () => {
+      try {
+        const partner = await coupleService.get()
+        if (partner) {
+          if (pollRef.current) clearInterval(pollRef.current)
+          await refresh()
+          navigate('/app/whats-new', { replace: true })
+        }
+      } catch {
+        // ignore transient
+      }
+    }, 5000)
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
       }
     }
-    const id = setInterval(() => void tick(), 5000)
-    return () => clearInterval(id)
   }, [invite, refresh, navigate])
 
   const createInvite = async () => {
@@ -75,7 +90,7 @@ export function PartnerOnboardingPage() {
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
     } catch {
-      /* clipboard blocked — user can select manually */
+      // clipboard blocked — user can select manually
     }
   }
 
@@ -144,8 +159,8 @@ export function PartnerOnboardingPage() {
             Waiting for your partner
           </h2>
           <p className="mt-2 text-sm text-muted">
-            Send this code to your partner. Once they enter it on their
-            account, you'll both be connected.
+            Send this code to {user?.firstName ? `your partner` : 'them'}. Once
+            they enter it on their account, you'll both be connected.
           </p>
         </div>
 

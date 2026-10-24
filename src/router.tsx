@@ -3,6 +3,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { PublicLayout } from '@/components/layout/PublicLayout'
 import { ChatPage } from '@/routes/app/ChatPage'
 import { GiftsPage } from '@/routes/app/GiftsPage'
+import { PartnerOnboardingPage } from '@/routes/app/PartnerOnboardingPage'
 import { PhotoboothPage as AppPhotoboothPage } from '@/routes/app/PhotoboothPage'
 import { VideoCallPage } from '@/routes/app/VideoCallPage'
 import { WhatsNewPage } from '@/routes/app/WhatsNewPage'
@@ -12,6 +13,7 @@ import { LoginPage } from '@/routes/public/LoginPage'
 import { NotFoundPage } from '@/routes/public/NotFoundPage'
 import { PhotoboothPage as PublicPhotoboothPage } from '@/routes/public/PhotoboothPage'
 import { PrivacyPage } from '@/routes/public/PrivacyPage'
+import { SignupPage } from '@/routes/public/SignupPage'
 import { ThankYouPage } from '@/routes/public/ThankYouPage'
 
 export const router = createBrowserRouter([
@@ -21,10 +23,11 @@ export const router = createBrowserRouter([
     children: [
       { path: '/', element: <HomePage /> },
       { path: '/login', element: <LoginPage /> },
+      { path: '/signup', element: <SignupPage /> },
       { path: '/donate/:code?', element: <DonatePage /> },
       { path: '/thank-you', element: <ThankYouPage /> },
       { path: '/photobooth', element: <PublicPhotoboothPage /> },
-      { path: '/privacy', element: <PrivacyPage /> },   // ← moved here
+      { path: '/privacy', element: <PrivacyPage /> },
     ],
   },
   {
@@ -32,6 +35,8 @@ export const router = createBrowserRouter([
     element: <AppShell />,
     children: [
       { index: true, element: <Navigate to="/app/whats-new" replace /> },
+      { path: 'pair', element: <PartnerOnboardingPage /> },
+      { path: 'onboarding', element: <Navigate to="/app/pair" replace /> },
       { path: 'whats-new', element: <WhatsNewPage /> },
       { path: 'chat', element: <ChatPage /> },
       { path: 'video', element: <VideoCallPage /> },

@@ -5,6 +5,8 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { TopBar } from '@/components/layout/TopBar'
 import { useAuthStore } from '@/store/authStore'
 
+const PAIR_PATH = '/app/pair'
+
 export function AppShell() {
   const { pathname } = useLocation()
   const user = useAuthStore((s) => s.user)
@@ -23,8 +25,12 @@ export function AppShell() {
     )
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />
+  if (!user) return <Navigate to="/login" replace />
+
+  const onPair = pathname === PAIR_PATH
+  if (!user.partner && !onPair) return <Navigate to={PAIR_PATH} replace />
+  if (user.partner && onPair) {
+    return <Navigate to="/app/whats-new" replace />
   }
 
   return (

@@ -11,7 +11,7 @@ const schema = z.object({
   lastName: z.string().min(1, 'Last name required'),
   email: z.string().email('Enter a valid email'),
   password: z.string().min(6, 'At least 6 characters'),
-  city: z.string().optional().default(''),
+  city: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -25,15 +25,21 @@ export function SignupPage() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { firstName: '', lastName: '', email: '', password: '', city: '' },
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+      city: '',
+    },
   })
 
   const onSubmit = async (values: FormValues) => {
     try {
       await signUp(values)
-      navigate('/app/pair', { replace: true })
+      navigate('/app/onboarding', { replace: true })
     } catch {
-      /* shown from store */
+      // error shown from store
     }
   }
 
@@ -41,7 +47,9 @@ export function SignupPage() {
     <Card className="space-y-5">
       <div className="text-center">
         <p className="font-script text-2xl text-rose">NearbyHearts</p>
-        <p className="mt-1 text-sm text-muted">Create your account.</p>
+        <p className="mt-1 text-sm text-muted">
+          Create your account. Then connect with your person.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
@@ -53,7 +61,9 @@ export function SignupPage() {
               className="mt-1 w-full rounded-field border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
             {errors.firstName && (
-              <p className="mt-1 text-xs text-rose-strong">{errors.firstName.message}</p>
+              <p className="mt-1 text-xs text-rose-strong">
+                {errors.firstName.message}
+              </p>
             )}
           </label>
           <label className="block">
@@ -63,7 +73,9 @@ export function SignupPage() {
               className="mt-1 w-full rounded-field border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
             {errors.lastName && (
-              <p className="mt-1 text-xs text-rose-strong">{errors.lastName.message}</p>
+              <p className="mt-1 text-xs text-rose-strong">
+                {errors.lastName.message}
+              </p>
             )}
           </label>
         </div>
@@ -90,7 +102,9 @@ export function SignupPage() {
             className="mt-1 w-full rounded-field border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
           />
           {errors.password && (
-            <p className="mt-1 text-xs text-rose-strong">{errors.password.message}</p>
+            <p className="mt-1 text-xs text-rose-strong">
+              {errors.password.message}
+            </p>
           )}
         </label>
 
