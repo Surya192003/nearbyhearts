@@ -20,7 +20,7 @@ export const pairService = {
 
   async cancel(id: string): Promise<void> {
     const res = await fetch(
-      `${import.meta.env.VITE_API_URL ?? 'http://localhost:4000'}/pair/requests/${id}`,
+      `${import.meta.env.VITE_API_URL}/pair/requests/${id}`,
       { method: 'DELETE', credentials: 'include' },
     )
     if (!res.ok) throw new Error(`Cancel failed: ${res.status}`)

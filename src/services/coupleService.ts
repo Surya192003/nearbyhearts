@@ -12,7 +12,7 @@ export const coupleService = {
     distanceKm?: number | null
   }): Promise<Couple> {
     const res = await fetch(
-      `${import.meta.env.VITE_API_URL ?? 'http://localhost:4000'}/couple`,
+      `${import.meta.env.VITE_API_URL}/couple`,
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

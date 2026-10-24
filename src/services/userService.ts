@@ -17,7 +17,7 @@ export const userService = {
   async updateMe(payload: UpdatePayload): Promise<UpdateResult> {
     // PATCH helper — inline since api.ts only has GET/POST
     const res = await fetch(
-      `${import.meta.env.VITE_API_URL ?? 'http://localhost:4000'}/users/me`,
+      `${import.meta.env.VITE_API_URL}/users/me`,
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
