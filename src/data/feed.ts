@@ -1,0 +1,58 @@
+import type { FeedItem } from '@/types'
+
+const ago = (mins: number) => new Date(Date.now() - mins * 60_000).toISOString()
+
+export const FEED_SEED: FeedItem[] = [
+  {
+    id: 'feed_1',
+    authorId: 'usr_02',
+    authorName: 'Sam',
+    authorAvatarUrl: null,
+    kind: 'mood',
+    text: 'Missing you extra today 💭',
+    imageUrl: null,
+    mood: '🥺',
+    createdAt: ago(14),
+    reactionCount: 1,
+    reactedByMe: false,
+  },
+  {
+    id: 'feed_2',
+    authorId: 'usr_02',
+    authorName: 'Sam',
+    authorAvatarUrl: null,
+    kind: 'photo',
+    text: 'Coffee by the river — wish you were here.',
+    imageUrl: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=900&q=80',
+    mood: null,
+    createdAt: ago(190),
+    reactionCount: 3,
+    reactedByMe: true,
+  },
+  {
+    id: 'feed_3',
+    authorId: 'usr_01',
+    authorName: 'Alex',
+    authorAvatarUrl: null,
+    kind: 'milestone',
+    text: '6 months since our first video call 🎉',
+    imageUrl: null,
+    mood: null,
+    createdAt: ago(1440),
+    reactionCount: 2,
+    reactedByMe: false,
+  },
+  {
+    id: 'feed_4',
+    authorId: 'usr_02',
+    authorName: 'Sam',
+    authorAvatarUrl: null,
+    kind: 'note',
+    text: 'Left you a voice note before bed. Listen when you wake up.',
+    imageUrl: null,
+    mood: null,
+    createdAt: ago(2900),
+    reactionCount: 0,
+    reactedByMe: false,
+  },
+]
