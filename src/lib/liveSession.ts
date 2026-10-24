@@ -1,4 +1,3 @@
-// @ts-ignore -- peerjs may be provided by the app runtime without installed typings.
 import Peer, {
   type DataConnection,
   type MediaConnection,
@@ -10,6 +9,14 @@ const PEER_CONFIG: PeerJSOption = {
   port: Number(import.meta.env.VITE_PEER_PORT ?? 443),
   secure: (import.meta.env.VITE_PEER_SECURE ?? 'true') === 'true',
   path: import.meta.env.VITE_PEER_PATH ?? '/',
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:global.stun.twilio.com:3478' },
+    ],
+    iceCandidatePoolSize: 4,
+  },
   debug: 1,
 }
 
@@ -56,6 +63,14 @@ function waitOpen(peer: Peer): Promise<void> {
   })
 }
 
+function isTransientError(msg: string): boolean {
+  return (
+    msg.includes('peer-unavailable') ||
+    msg.includes('Could not connect to peer') ||
+    msg.includes('network')
+  )
+}
+
 export async function startHost(
   localStream: MediaStream,
   handlers: LiveHandlers,
@@ -75,9 +90,19 @@ export async function startHost(
   let connected = false
 
   peer.on('call', (call) => {
-    call.answer(localStream)
     mediaConn = call
+
+    // Register listeners BEFORE answer(), so no event can arrive unwatched.
     call.on('stream', (remote) => {
+      if (import.meta.env.DEV) {
+        console.info(
+          '[live:host] remote stream received',
+          remote.getVideoTracks().length,
+          'video track(s),',
+          remote.getAudioTracks().length,
+          'audio track(s)',
+        )
+      }
       handlers.onRemoteStream(remote)
       if (!connected) {
         connected = true
@@ -86,6 +111,8 @@ export async function startHost(
     })
     call.on('close', () => handlers.onPeerDisconnected?.())
     call.on('error', (err) => handlers.onError(err.message))
+
+    call.answer(localStream)
   })
 
   peer.on('connection', (conn) => {
@@ -98,7 +125,10 @@ export async function startHost(
   })
 
   peer.on('disconnected', () => handlers.onPeerDisconnected?.())
-  peer.on('error', (err) => handlers.onError(err.message))
+  peer.on('error', (err) => {
+    if (isTransientError(err.message)) return
+    handlers.onError(err.message)
+  })
 
   return {
     roomCode: code,
@@ -134,7 +164,17 @@ export async function joinRoom(
     throw new Error('Could not reach the other side. Check the room code.')
   }
 
+  // Attach listener BEFORE any await, so the stream event can't slip past.
   call.on('stream', (remote) => {
+    if (import.meta.env.DEV) {
+      console.info(
+        '[live:guest] remote stream received',
+        remote.getVideoTracks().length,
+        'video track(s),',
+        remote.getAudioTracks().length,
+        'audio track(s)',
+      )
+    }
     handlers.onRemoteStream(remote)
     handlers.onPeerConnected?.()
   })
