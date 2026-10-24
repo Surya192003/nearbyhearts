@@ -46,14 +46,27 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   return handle<T>(res, `POST ${path}`)
 }
 
-export async function apiPostNoContent(path: string, body?: unknown): Promise<void> {
+export async function apiPostNoContent(
+  path: string,
+  body?: unknown,
+): Promise<void> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-  await handle<unknown>(res, `POST ${path}`)
+  if (!res.ok) {
+    let detail = `${res.status} ${res.statusText}`
+    try {
+      const b = (await res.json()) as { error?: string }
+      if (b.error) detail = b.error
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(res.status, `POST ${path}: ${detail}`)
+  }
+  // Deliberately do not parse body — some endpoints return 204/empty.
 }
 
 export type BackendHealth = { ok: boolean; db: boolean; time: string }

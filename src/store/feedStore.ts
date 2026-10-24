@@ -5,6 +5,7 @@ import type { FeedItem } from '@/types'
 type State = {
   items: FeedItem[]
   loading: boolean
+  error: string | null
   load: () => Promise<void>
   react: (id: string) => Promise<void>
   create: (input: {
@@ -20,16 +21,28 @@ type State = {
 export const useFeedStore = create<State>((set) => ({
   items: [],
   loading: false,
+  error: null,
 
   async load() {
-    set({ loading: true })
-    const items = await feedService.list()
-    set({ items, loading: false })
+    set({ loading: true, error: null })
+    try {
+      const items = await feedService.list()
+      set({ items, loading: false })
+    } catch (err) {
+      set({
+        loading: false,
+        error: err instanceof Error ? err.message : 'Could not load feed',
+      })
+    }
   },
 
   async react(id) {
-    const updated = await feedService.react(id)
-    set((s) => ({ items: s.items.map((i) => (i.id === id ? updated : i)) }))
+    try {
+      const updated = await feedService.react(id)
+      set((s) => ({ items: s.items.map((i) => (i.id === id ? updated : i)) }))
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Could not react' })
+    }
   },
 
   async create(input) {
