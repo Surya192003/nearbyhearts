@@ -102,6 +102,8 @@ export type Message = {
   text: string
   createdAt: string
   status: 'sending' | 'sent' | 'read'
+  isIncognito: boolean
+  expiresAt: string
 }
 
 export type Gift = {

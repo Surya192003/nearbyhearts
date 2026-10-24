@@ -68,6 +68,11 @@ export function HomePage() {
           </div>
         ))}
       </div>
+      <p className="text-center text-xs text-muted">
+        <Link to="/privacy" className="font-semibold text-accent hover:underline">
+          Privacy & Terms
+        </Link>
+      </p>
     </div>
   )
 }
