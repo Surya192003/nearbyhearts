@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { BottomNav } from '@/components/layout/BottomNav'
@@ -11,6 +12,11 @@ export function AppShell() {
   const { pathname } = useLocation()
   const user = useAuthStore((s) => s.user)
   const status = useAuthStore((s) => s.status)
+  const refresh = useAuthStore((s) => s.refresh)
+
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
 
   if (status === 'idle' || status === 'loading') {
     return (
@@ -36,7 +42,6 @@ export function AppShell() {
   return (
     <div className="min-h-screen bg-canvas">
       <Sidebar />
-
       <div className="nav:pl-[264px]">
         <TopBar />
         <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-5 nav:px-8 nav:pb-12">
@@ -50,7 +55,6 @@ export function AppShell() {
           </motion.div>
         </main>
       </div>
-
       <BottomNav />
     </div>
   )

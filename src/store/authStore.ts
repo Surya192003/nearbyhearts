@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { authService } from '@/services/authService'
+import { onUnauthorized } from '@/lib/authEvents'
 import type { SignInPayload, SignUpPayload, User } from '@/types'
-
 
 type Status = 'idle' | 'loading' | 'authenticated' | 'anonymous'
 
@@ -16,13 +16,12 @@ type State = {
   signOut: () => Promise<void>
 }
 
-export const useAuthStore = create<State>((set, get) => ({
+export const useAuthStore = create<State>((set) => ({
   user: null,
   status: 'idle',
   error: null,
 
   async hydrate() {
-    if (get().status !== 'idle') return
     set({ status: 'loading' })
     try {
       const user = await authService.getCurrentUser()
@@ -37,7 +36,7 @@ export const useAuthStore = create<State>((set, get) => ({
       const user = await authService.getCurrentUser()
       set({ user, status: user ? 'authenticated' : 'anonymous' })
     } catch {
-      // keep current state on failure
+      set({ user: null, status: 'anonymous' })
     }
   },
 
@@ -47,8 +46,7 @@ export const useAuthStore = create<State>((set, get) => ({
       const user = await authService.signIn(payload)
       set({ user, status: 'authenticated' })
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Could not sign you in.'
+      const message = err instanceof Error ? err.message : 'Could not sign you in.'
       set({ status: 'anonymous', error: message })
       throw err
     }
@@ -60,8 +58,7 @@ export const useAuthStore = create<State>((set, get) => ({
       const user = await authService.signUp(payload)
       set({ user, status: 'authenticated' })
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Could not create your account.'
+      const message = err instanceof Error ? err.message : 'Could not create your account.'
       set({ status: 'anonymous', error: message })
       throw err
     }
@@ -75,3 +72,7 @@ export const useAuthStore = create<State>((set, get) => ({
     }
   },
 }))
+
+onUnauthorized(() => {
+  useAuthStore.setState({ user: null, status: 'anonymous', error: null })
+})

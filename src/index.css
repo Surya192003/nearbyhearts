@@ -10,11 +10,11 @@
   body {
     @apply bg-canvas font-serif text-ink antialiased;
     font-size: 17px;
-    line-height: 1.55;
+    line-height: 1.6;
   }
 
   h1, h2, h3 {
-    @apply font-serif font-medium;
+    @apply font-serif font-medium tracking-wide;
   }
 
   :focus-visible {
@@ -24,7 +24,7 @@
 
 @layer components {
   .label {
-    @apply font-sans text-[0.68rem] font-bold uppercase tracking-[0.18em] text-muted;
+    @apply font-sans text-[0.7rem] font-bold uppercase tracking-[0.15em] text-muted;
   }
 }
 

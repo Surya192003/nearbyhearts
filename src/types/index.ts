@@ -1,41 +1,41 @@
-export type Couple = {
-  id: string
-  togetherSince: string | null
-}
-
 export type Partner = {
   id: string
   firstName: string
   lastName: string
   avatarUrl: string | null
   city: string
-  state: string | null
-  country: string | null
   timezone: string
-  latitude: number | null
-  longitude: number | null
   lastSeenAt: string
 }
 
 export type User = {
   id: string
+  email: string
   firstName: string
   lastName: string
-  email: string
   avatarUrl: string | null
   city: string
-  state: string | null
-  country: string | null
   timezone: string
-  latitude: number | null
-  longitude: number | null
-  pairCode: string
-  couple: Couple | null
+  lastSeenAt: string
+  couple: { id: string; togetherSince: string | null } | null
   partner: Partner | null
 }
 
-export type SignInPayload = { email: string; password: string }
+export type Couple = {
+  id: string
+  userId: string
+  partnerId: string
+  togetherSince: string | null
+  nextVisitAt: string | null
+  distanceKm: number | null
+}
 
+export type InviteCode = {
+  code: string
+  expiresAt: string
+}
+
+export type SignInPayload = { email: string; password: string }
 export type SignUpPayload = {
   email: string
   password: string
@@ -44,50 +44,7 @@ export type SignUpPayload = {
   city?: string
 }
 
-export type InviteCode = {
-  code: string
-  expiresAt: string
-}
-
-
-
-export type VisitStatus =
-  | 'scheduled'
-  | 'cancel_pending'
-  | 'cancelled'
-  | 'completed'
-
-export type Visit = {
-  id: string
-  createdBy: string
-  title: string
-  scheduledAt: string
-  status: VisitStatus
-  cancelRequestedBy: string | null
-  cancelReason: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-export type PairRequest = {
-  id: string
-  fromUser: {
-    id: string
-    firstName: string
-    lastName: string
-    avatarUrl: string | null
-  }
-  message: string | null
-  createdAt: string
-}
-
-export type PairStatus = {
-  incoming: PairRequest[]
-  outgoing: PairRequest[]
-}
-
 export type FeedKind = 'note' | 'photo' | 'milestone' | 'mood'
-
 export type FeedItem = {
   id: string
   authorId: string
@@ -128,6 +85,13 @@ export type SentGift = {
   toUserId: string
   note: string
   createdAt: string
+}
+
+export type CallSession = {
+  id: string
+  roomUrl: string
+  partnerOnline: boolean
+  startedAt: string | null
 }
 
 export type DonationPayload = {

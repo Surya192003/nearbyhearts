@@ -1,4 +1,4 @@
-import { LogOut, Shield } from 'lucide-react'
+import { LogOut, Settings, Shield } from 'lucide-react'
 import { Link, NavLink } from 'react-router-dom'
 import { Avatar } from '@/components/ui/Avatar'
 import { NAV_ITEMS } from '@/config/nav'
@@ -22,9 +22,7 @@ export function Sidebar() {
             src={user.partner.avatarUrl}
           />
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">
-              {user.partner.firstName}
-            </p>
+            <p className="truncate text-sm font-semibold">{user.partner.firstName}</p>
             <p className="label truncate">Your person 💕</p>
           </div>
         </div>
@@ -33,9 +31,7 @@ export function Sidebar() {
           to="/app/pair"
           className="mt-6 flex items-center gap-3 rounded-card border border-dashed border-accent/50 bg-cream/40 p-3 text-left transition hover:bg-accent-soft"
         >
-          <span className="grid h-10 w-10 place-items-center rounded-full bg-primary text-accent">
-            +
-          </span>
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-primary text-accent">+</span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">Pair with your partner</p>
             <p className="text-[10px] text-muted">Share your code</p>
@@ -63,6 +59,14 @@ export function Sidebar() {
             </NavLink>
           ))}
       </nav>
+
+      <Link
+        to="/app/settings"
+        className="flex items-center gap-3 rounded-field border border-transparent px-3 py-2.5 text-sm text-muted transition hover:bg-cream hover:text-ink"
+      >
+        <Settings className="h-[18px] w-[18px]" aria-hidden="true" />
+        Settings
+      </Link>
 
       <Link
         to="/privacy"

@@ -1,3 +1,4 @@
+
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { PublicLayout } from '@/components/layout/PublicLayout'
@@ -5,6 +6,7 @@ import { ChatPage } from '@/routes/app/ChatPage'
 import { GiftsPage } from '@/routes/app/GiftsPage'
 import { PartnerOnboardingPage } from '@/routes/app/PartnerOnboardingPage'
 import { PhotoboothPage as AppPhotoboothPage } from '@/routes/app/PhotoboothPage'
+import { SettingsPage } from '@/routes/app/SettingsPage'
 import { VideoCallPage } from '@/routes/app/VideoCallPage'
 import { WhatsNewPage } from '@/routes/app/WhatsNewPage'
 import { DonatePage } from '@/routes/public/DonatePage'
@@ -15,6 +17,21 @@ import { PhotoboothPage as PublicPhotoboothPage } from '@/routes/public/Photoboo
 import { PrivacyPage } from '@/routes/public/PrivacyPage'
 import { SignupPage } from '@/routes/public/SignupPage'
 import { ThankYouPage } from '@/routes/public/ThankYouPage'
+
+const isRefresh =
+  typeof window !== 'undefined' &&
+  window.performance
+    ?.getEntriesByType('navigation')
+    .some((entry) => (entry as PerformanceNavigationTiming).type === 'reload')
+
+const initialPath =
+  typeof window !== 'undefined' ? window.location.pathname : '/'
+
+const shouldRedirectOnRefresh = isRefresh && initialPath !== '/'
+
+if (shouldRedirectOnRefresh) {
+  window.location.replace('/')
+}
 
 export const router = createBrowserRouter([
   {
@@ -42,6 +59,7 @@ export const router = createBrowserRouter([
       { path: 'video', element: <VideoCallPage /> },
       { path: 'gifts', element: <GiftsPage /> },
       { path: 'photobooth', element: <AppPhotoboothPage /> },
+      { path: 'settings', element: <SettingsPage /> },
       { path: '*', element: <Navigate to="/app/whats-new" replace /> },
     ],
   },

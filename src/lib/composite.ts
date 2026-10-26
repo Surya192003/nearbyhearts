@@ -48,7 +48,7 @@ function drawCover(
 
 /**
  * Produce a square composite: left = "you" (mirrored), right = "partner".
- * Gold divider down the middle. Returned as a JPEG blob + object URL.
+ * Terracotta divider down the middle. Returned as a JPEG blob + object URL.
  */
 export function makeComposite(
   left: CompositeSource,
@@ -65,7 +65,8 @@ export function makeComposite(
       return
     }
 
-    ctx.fillStyle = '#fbfaf7'
+    // Matches tailwind config canvas (#fdfbf7)
+    ctx.fillStyle = '#fdfbf7'
     ctx.fillRect(0, 0, outSize, outSize)
 
     const halfW = outSize / 2
@@ -77,7 +78,8 @@ export function makeComposite(
       return
     }
 
-    ctx.strokeStyle = '#c8a563'
+    // Matches tailwind config accent (#d47a55)
+    ctx.strokeStyle = '#d47a55'
     ctx.lineWidth = 4
     ctx.beginPath()
     ctx.moveTo(halfW, 0)

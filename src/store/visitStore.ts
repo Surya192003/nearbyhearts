@@ -1,22 +1,23 @@
 import { create } from 'zustand'
-import { visitService } from '@/services/visitService'
-import type { Visit } from '@/types'
+import { visitService, type Visit } from '@/services/visitService'
 
 type State = {
   visits: Visit[]
   loading: boolean
+  saving: boolean
   error: string | null
   load: () => Promise<void>
-  create: (input: { title?: string; scheduledAt: string }) => Promise<Visit>
+  create: (input: { title?: string; scheduledAt: string }) => Promise<void>
   requestCancel: (id: string, reason?: string) => Promise<void>
   approveCancel: (id: string) => Promise<void>
   rejectCancel: (id: string) => Promise<void>
   withdrawCancel: (id: string) => Promise<void>
 }
 
-export const useVisitStore = create<State>((set, get) => ({
+export const useVisitStore = create<State>((set) => ({
   visits: [],
   loading: false,
+  saving: false,
   error: null,
 
   async load() {
@@ -33,15 +34,21 @@ export const useVisitStore = create<State>((set, get) => ({
   },
 
   async create(input) {
-    const v = await visitService.create(input)
-    set((s) => ({ visits: [...s.visits, v].sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt)) }))
-    return v
+    set({ saving: true, error: null })
+    try {
+      const v = await visitService.create(input)
+      set((s) => ({
+        visits: [...s.visits, v].sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt)),
+        saving: false,
+      }))
+    } catch (err) {
+      set({ saving: false, error: err instanceof Error ? err.message : 'Create failed' })
+    }
   },
 
   async requestCancel(id, reason) {
     const v = await visitService.requestCancel(id, reason)
     set((s) => ({ visits: s.visits.map((x) => (x.id === id ? v : x)) }))
-    void get()
   },
 
   async approveCancel(id) {

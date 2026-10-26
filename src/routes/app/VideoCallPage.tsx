@@ -14,8 +14,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Pill } from '@/components/ui/Pill'
-import { formatDistance, haversineKm } from '@/lib/distance'
-import { timeAgo } from '@/lib/format'
+import { formatDistance, timeAgo } from '@/lib/format'
 import {
   joinRoom,
   startHost,
@@ -23,14 +22,28 @@ import {
   type LiveSession,
 } from '@/lib/liveSession'
 import { useAuthStore } from '@/store/authStore'
+import { useCountdownStore } from '@/store/countdownStore'
 
 type Phase = 'pick' | 'hosting' | 'joining' | 'connected'
 
 const DEV = import.meta.env.DEV
 
+// Room code for the manual flow. Uppercase to match the join input's
+// `.toUpperCase()` behavior, so both sides always match.
+function generateRoomCode(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let s = 'NH-'
+  for (let i = 0; i < 6; i += 1) {
+    s += alphabet[Math.floor(Math.random() * alphabet.length)]
+  }
+  return s
+}
+
 export function VideoCallPage() {
   const user = useAuthStore((s) => s.user)
   const partner = user?.partner
+  const coupleDistanceKm = useCountdownStore((s) => s.distanceKm)
+  const loadCountdown = useCountdownStore((s) => s.load)
 
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -49,29 +62,28 @@ export function VideoCallPage() {
 
   const isPaired = Boolean(user?.couple && user.partner)
 
-  const liveKm =
-    user?.latitude != null &&
-    user.longitude != null &&
-    partner?.latitude != null &&
-    partner.longitude != null
-      ? haversineKm(
-          { lat: user.latitude, lng: user.longitude },
-          { lat: partner.latitude, lng: partner.longitude },
-        )
-      : null
+  // Distance comes from the couple row (set via /app/settings → couple details).
+  const liveKm = coupleDistanceKm
 
   useEffect(() => {
-    if (localVideoRef.current && localStreamRef.current) {
-      localVideoRef.current.srcObject = localStreamRef.current
-      void localVideoRef.current.play().catch(() => {})
-    }
+    void loadCountdown()
+  }, [loadCountdown])
+
+  // Attach local stream on every render — idempotent, catches late-mounted
+  // <video> elements (e.g. when phase transitions from pick → hosting).
+  useEffect(() => {
+    const el = localVideoRef.current
+    const stream = localStreamRef.current
+    if (!el || !stream) return
+    if (el.srcObject !== stream) el.srcObject = stream
+    if (el.paused) void el.play().catch(() => {})
   })
 
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream
-      void remoteVideoRef.current.play().catch(() => {})
-    }
+    const el = remoteVideoRef.current
+    if (!el || !remoteStream) return
+    if (el.srcObject !== remoteStream) el.srcObject = remoteStream
+    if (el.paused) void el.play().catch(() => {})
   }, [remoteStream])
 
   useEffect(() => {
@@ -103,7 +115,7 @@ export function VideoCallPage() {
       setPhase('connected')
     },
     onRemoteCapture: () => {
-      /* not used in video calls */
+      /* capture is photobooth-only, not used in video calls */
     },
     onPeerConnected: () => setPhase('connected'),
     onPeerDisconnected: () => {
@@ -122,7 +134,8 @@ export function VideoCallPage() {
     setError(null)
     try {
       const stream = await requestLocalStream()
-      const session = await startHost(stream, handlers)
+      const code = generateRoomCode()
+      const session = await startHost(code, stream, handlers)
       sessionRef.current = session
       setRoomCode(session.roomCode)
       setPhase('hosting')
@@ -135,7 +148,7 @@ export function VideoCallPage() {
   }
 
   const join = async () => {
-    const code = joinCode.trim()
+    const code = joinCode.trim().toUpperCase()
     if (!code) {
       setError('Enter a room code first.')
       return
@@ -261,8 +274,8 @@ export function VideoCallPage() {
             <div className="flex gap-2">
               <input
                 value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value)}
-                placeholder="nh-ABC123"
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                placeholder="NH-ABC123"
                 className="flex-1 rounded-field border border-line bg-surface px-3 py-2 font-mono text-sm uppercase outline-none focus:border-accent"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void join()
@@ -312,6 +325,7 @@ export function VideoCallPage() {
             <video
               ref={localVideoRef}
               playsInline
+              autoPlay
               muted
               className="h-full w-full scale-x-[-1] object-cover"
             />
@@ -333,6 +347,7 @@ export function VideoCallPage() {
               ref={remoteVideoRef}
               playsInline
               autoPlay
+              muted
               className="h-full w-full object-cover"
             />
             <span className="absolute bottom-2 left-2 rounded-pill bg-black/60 px-2 py-0.5 font-sans text-[10px] font-bold uppercase tracking-[0.14em] text-white">
@@ -342,6 +357,7 @@ export function VideoCallPage() {
               <video
                 ref={localVideoRef}
                 playsInline
+                autoPlay
                 muted
                 className="h-full w-full scale-x-[-1] object-cover"
               />

@@ -5,7 +5,6 @@ export const coupleService = {
   async get(): Promise<Couple> {
     return apiGet<Couple>('/couple')
   },
-
   async update(patch: {
     togetherSince?: string | null
     nextVisitAt?: string | null
@@ -13,17 +12,11 @@ export const coupleService = {
   }): Promise<Couple> {
     return apiPatch<Couple>('/couple', patch)
   },
-
-  /** Generate a 6-char invite code, valid 7 days. Reuses an active one if present. */
   async createInvite(): Promise<InviteCode> {
     return apiPost<InviteCode>('/couple/invite', {})
   },
-
-  /** Join an existing couple using an invite code. Returns the new partner. */
   async joinWithCode(code: string): Promise<Partner> {
-    const { partner } = await apiPost<{ partner: Partner }>('/couple/join', {
-      code,
-    })
+    const { partner } = await apiPost<{ partner: Partner }>('/couple/join', { code })
     return partner
   },
 }

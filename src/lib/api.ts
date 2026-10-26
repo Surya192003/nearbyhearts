@@ -1,6 +1,7 @@
-const raw = import.meta.env.VITE_API_URL 
-export const API_BASE_URL = raw.replace(/\/+$/, '')
+import { emitUnauthorized } from '@/lib/authEvents'
 
+const raw = import.meta.env.VITE_API_URL ?? 'http://localhost:4000'
+export const API_BASE_URL = raw.replace(/\/+$/, '')
 
 export class ApiError extends Error {
   status: number
@@ -12,13 +13,17 @@ export class ApiError extends Error {
 }
 
 async function handle<T>(res: Response, label: string): Promise<T> {
+  if (res.status === 401) {
+    emitUnauthorized()
+    throw new ApiError(401, `${label}: Unauthorized`)
+  }
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`
     try {
       const body = (await res.json()) as { error?: string }
       if (body.error) detail = body.error
     } catch {
-      /* ignore */
+      /* non-JSON */
     }
     throw new ApiError(res.status, `${label}: ${detail}`)
   }
@@ -32,7 +37,10 @@ export async function apiGet<T>(path: string): Promise<T> {
 
 export async function apiGetOptional<T>(path: string): Promise<T | null> {
   const res = await fetch(`${API_BASE_URL}${path}`, { credentials: 'include' })
-  if (res.status === 401) return null
+  if (res.status === 401) {
+    emitUnauthorized()
+    return null
+  }
   return handle<T>(res, `GET ${path}`)
 }
 
@@ -45,6 +53,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   })
   return handle<T>(res, `POST ${path}`)
 }
+
 export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'PATCH',
@@ -55,32 +64,26 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   return handle<T>(res, `PATCH ${path}`)
 }
 
-export async function apiPostNoContent(
-  path: string,
-  body?: unknown,
-): Promise<void> {
+export async function apiPostNoContent(path: string, body?: unknown): Promise<void> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-  if (!res.ok) {
+  if (!res.ok && res.status !== 401) {
     let detail = `${res.status} ${res.statusText}`
     try {
       const b = (await res.json()) as { error?: string }
       if (b.error) detail = b.error
     } catch {
-      /* non-JSON error body */
+      /* non-JSON */
     }
     throw new ApiError(res.status, `POST ${path}: ${detail}`)
   }
-  // Deliberately do not parse body — some endpoints return 204/empty.
 }
 
 export type BackendHealth = { ok: boolean; db: boolean; time: string }
-
-
 
 export async function pingBackend(): Promise<BackendHealth | null> {
   try {
