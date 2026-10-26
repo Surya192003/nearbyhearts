@@ -4,7 +4,11 @@ export type Partner = {
   lastName: string
   avatarUrl: string | null
   city: string
+  state: string | null
+  country: string | null
   timezone: string
+  latitude: number | null
+  longitude: number | null
   lastSeenAt: string
 }
 
@@ -15,7 +19,11 @@ export type User = {
   lastName: string
   avatarUrl: string | null
   city: string
+  state: string | null
+  country: string | null
   timezone: string
+  latitude: number | null
+  longitude: number | null
   lastSeenAt: string
   couple: { id: string; togetherSince: string | null } | null
   partner: Partner | null

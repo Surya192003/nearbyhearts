@@ -1,9 +1,11 @@
-export type LatLng = { lat: number; lng: number }
+export { formatDistance } from './format'
 
-/** Great-circle distance in kilometres. */
-export function haversineKm(a: LatLng, b: LatLng): number {
+export function haversineKm(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number {
   const R = 6371
-  const toRad = (deg: number) => (deg * Math.PI) / 180
+  const toRad = (d: number) => (d * Math.PI) / 180
   const dLat = toRad(b.lat - a.lat)
   const dLng = toRad(b.lng - a.lng)
   const lat1 = toRad(a.lat)
@@ -11,94 +13,94 @@ export function haversineKm(a: LatLng, b: LatLng): number {
   const h =
     Math.sin(dLat / 2) ** 2 +
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)))
+  return 2 * R * Math.asin(Math.sqrt(h))
 }
 
-export function formatDistance(km: number): string {
-  return km < 1 ? `${Math.round(km * 1000)} m` : `${Math.round(km).toLocaleString()} km`
+function getTimezoneOffsetHours(timezone: string, at: Date): number {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hourCycle: 'h23',
+  })
+  const parts = dtf.formatToParts(at)
+  const get = (t: string) =>
+    parseInt(parts.find((p) => p.type === t)?.value ?? '0', 10)
+  const asUTC = Date.UTC(
+    get('year'),
+    get('month') - 1,
+    get('day'),
+    get('hour'),
+    get('minute'),
+    get('second'),
+  )
+  return (asUTC - at.getTime()) / 3_600_000
 }
 
-/** Local wall-clock time in the given IANA timezone, `HH:MM` (24h). */
-export function formatLocalTime(date: Date | string, timezone: string): string {
-  const d = typeof date === 'string' ? new Date(date) : date
-  try {
-    return new Intl.DateTimeFormat('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-      timeZone: timezone,
-    }).format(d)
-  } catch {
-    return '—'
-  }
-}
-
-function getOffsetMinutes(tz: string, at: Date): number {
-  try {
-    const dtf = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz,
-      hourCycle: 'h23',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    })
-    const parts = dtf.formatToParts(at)
-    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0)
-    const asUTC = Date.UTC(
-      get('year'),
-      get('month') - 1,
-      get('day'),
-      get('hour'),
-      get('minute'),
-      get('second'),
-    )
-    return (asUTC - at.getTime()) / 60000
-  } catch {
-    return 0
-  }
-}
-
-/** How many hours partner is ahead of you (positive = they are ahead). */
+/** tz2 minus tz1, in hours. Positive = partner's clock is ahead. */
 export function timezoneOffsetHours(
-  myTz: string,
-  partnerTz: string,
+  tz1: string,
+  tz2: string,
   at: Date = new Date(),
 ): number {
-  return (getOffsetMinutes(partnerTz, at) - getOffsetMinutes(myTz, at)) / 60
+  return getTimezoneOffsetHours(tz2, at) - getTimezoneOffsetHours(tz1, at)
+}
+
+export function formatLocalTime(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: timezone,
+  }).format(date)
 }
 
 export function formatHourDiff(hours: number): string {
-  if (Math.abs(hours) < 1 / 60) return 'Same time'
-  const sign = hours > 0 ? '+' : '−'
+  if (Math.abs(hours) < 0.01) return 'Same time'
   const abs = Math.abs(hours)
   const h = Math.floor(abs)
   const m = Math.round((abs - h) * 60)
-  return m === 0 ? `${sign}${h}h` : `${sign}${h}h ${m}m`
+  const str = m === 0 ? `${h}h` : `${h}h ${m}m`
+  return hours > 0 ? `+${str}` : `−${str}`
 }
 
 export function supportedTimezones(): string[] {
-  try {
-    return Intl.supportedValuesOf('timeZone')
-  } catch {
-    return [
-      'UTC',
-      'Europe/London',
-      'Europe/Dublin',
-      'Europe/Lisbon',
-      'Europe/Paris',
-      'Europe/Berlin',
-      'America/New_York',
-      'America/Chicago',
-      'America/Los_Angeles',
-      'America/Sao_Paulo',
-      'Asia/Kolkata',
-      'Asia/Dubai',
-      'Asia/Tokyo',
-      'Asia/Singapore',
-      'Australia/Sydney',
-    ]
+  const anyIntl = Intl as unknown as {
+    supportedValuesOf?: (key: string) => string[]
   }
+  if (typeof anyIntl.supportedValuesOf === 'function') {
+    try {
+      return anyIntl.supportedValuesOf('timeZone')
+    } catch {
+      // fall through
+    }
+  }
+  return [
+    'UTC',
+    'Europe/Dublin',
+    'Europe/London',
+    'Europe/Lisbon',
+    'Europe/Paris',
+    'Europe/Berlin',
+    'Europe/Madrid',
+    'Europe/Rome',
+    'America/New_York',
+    'America/Chicago',
+    'America/Denver',
+    'America/Los_Angeles',
+    'America/Sao_Paulo',
+    'America/Mexico_City',
+    'Asia/Kolkata',
+    'Asia/Dubai',
+    'Asia/Tokyo',
+    'Asia/Shanghai',
+    'Asia/Singapore',
+    'Australia/Sydney',
+    'Australia/Melbourne',
+    'Pacific/Auckland',
+  ]
 }
