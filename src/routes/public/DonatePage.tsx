@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { grantBonusPhotos, MIN_DONATION_CENTS } from '@/lib/photoQuota'
 import { donationService } from '@/services/donationService'
+import { useAuthStore } from '@/store/authStore'
 
 const schema = z.object({
   donorName: z.string().min(2, 'Tell us your name'),
@@ -21,6 +22,7 @@ const schema = z.object({
 type FormValues = z.input<typeof schema>
 
 export function DonatePage() {
+  const currentUser = useAuthStore((s) => s.user)
   const navigate = useNavigate()
   const { code = '' } = useParams<{ code?: string }>()
   const isPhotobooth = code === 'photobooth'
@@ -55,8 +57,8 @@ export function DonatePage() {
       message: values.message ?? '',
     })
 
-    if (isPhotobooth) {
-      grantBonusPhotos(10)
+     if (isPhotobooth) {
+      grantBonusPhotos(currentUser?.id, 10)
       navigate('/photobooth?unlocked=1')
       return
     }

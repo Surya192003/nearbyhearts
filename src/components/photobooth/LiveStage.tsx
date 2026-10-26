@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/Button'
 import { makeComposite } from '@/lib/composite'
 import type { Capture } from '@/lib/photoDb'
 import {
+  coupleRoomCode,
   joinRoom,
   startHost,
   type LiveHandlers,
@@ -10,33 +11,25 @@ import {
 } from '@/lib/liveSession'
 
 type Props = {
+  coupleId: string
   targetCount: number
   onComplete: (captures: Capture[]) => void
   onCancel: () => void
 }
 
-type Phase =
-  | 'pick'
-  | 'creating'
-  | 'showing-code'
-  | 'joining'
-  | 'connected'
+type Phase = 'starting' | 'connected' | 'error'
 
 const DEV = import.meta.env.DEV
 
-export function LiveStage({ targetCount, onComplete, onCancel }: Props) {
+export function LiveStage({ coupleId, targetCount, onComplete, onCancel }: Props) {
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const sessionRef = useRef<LiveSession | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
+  const captureRef = useRef<() => Promise<void>>(async () => {})
 
-  const [phase, setPhase] = useState<Phase>('pick')
-  const [joinCode, setJoinCode] = useState('')
-  const [roomCode, setRoomCode] = useState('')
-  const [peerName, setPeerName] = useState<string | null>(null)
+  const [phase, setPhase] = useState<Phase>('starting')
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [flash, setFlash] = useState(false)
@@ -44,7 +37,7 @@ export function LiveStage({ targetCount, onComplete, onCancel }: Props) {
   const [capturing, setCapturing] = useState(false)
   const [captures, setCaptures] = useState<Capture[]>([])
 
-  const captureRef = useRef<() => Promise<void>>(async () => {})
+  const roomCode = coupleRoomCode(coupleId)
 
   const cleanup = () => {
     sessionRef.current?.stop()
@@ -55,46 +48,29 @@ export function LiveStage({ targetCount, onComplete, onCancel }: Props) {
   }
 
   useEffect(() => {
-    return () => {
-      cleanup()
-    }
+    return () => { cleanup() }
   }, [])
 
-  // Attach local stream whenever both the video element and stream exist.
-  // No dep array: runs on every render, so it catches late-mounted elements
-  // (e.g. the first render where phase becomes 'connected').
   useEffect(() => {
     const el = localVideoRef.current
     const stream = localStreamRef.current
     if (!el || !stream) return
-    if (el.srcObject !== stream) {
-      el.srcObject = stream
-    }
-    if (el.paused) {
-      void el.play().catch((err) => {
-        if (DEV) console.warn('[live] local play failed', err)
-      })
-    }
+    if (el.srcObject !== stream) el.srcObject = stream
+    if (el.paused) void el.play().catch(() => {})
   })
 
-  // Same for remote — runs every render, idempotent.
   useEffect(() => {
     const el = remoteVideoRef.current
     if (!el || !remoteStream) return
     if (el.srcObject !== remoteStream) {
-      el.srcObject = remoteStream
       if (DEV) console.info('[live] remote srcObject attached')
+      el.srcObject = remoteStream
     }
-    if (el.paused) {
-      void el.play().catch((err) => {
-        if (DEV) console.warn('[live] remote play failed', err)
-      })
-    }
+    if (el.paused) void el.play().catch(() => {})
   })
 
   const runCapture = async () => {
-    if (capturing) return
-    if (!localVideoRef.current || !remoteVideoRef.current) return
+    if (capturing || !localVideoRef.current || !remoteVideoRef.current) return
     setCapturing(true)
     setError(null)
     const results: Capture[] = []
@@ -108,10 +84,7 @@ export function LiveStage({ targetCount, onComplete, onCancel }: Props) {
         setCountdown(null)
         setFlash(true)
         // eslint-disable-next-line no-await-in-loop
-        const cap = await makeComposite(
-          localVideoRef.current,
-          remoteVideoRef.current,
-        )
+        const cap = await makeComposite(localVideoRef.current, remoteVideoRef.current)
         results.push(cap)
         setShots((prev) => [...prev, cap])
         // eslint-disable-next-line no-await-in-loop
@@ -132,100 +105,65 @@ export function LiveStage({ targetCount, onComplete, onCancel }: Props) {
   }
   captureRef.current = runCapture
 
-  const requestLocalStream = async (): Promise<MediaStream> => {
-    if (localStreamRef.current) return localStreamRef.current
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user' },
-      audio: true,
-    })
-    localStreamRef.current = stream
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream
-      void localVideoRef.current.play().catch(() => {})
-    }
-    return stream
-  }
+  useEffect(() => {
+    let cancelled = false
 
-  const handlers: LiveHandlers = {
-    onRemoteStream: (stream) => {
-      if (DEV) {
-        console.info('[live] onRemoteStream fired', {
-          video: stream.getVideoTracks().length,
-          audio: stream.getAudioTracks().length,
+    const start = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user' },
+          audio: true,
         })
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
+        localStreamRef.current = stream
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream
+          void localVideoRef.current.play().catch(() => {})
+        }
+
+        const handlers: LiveHandlers = {
+          onRemoteStream: (remote) => {
+            setRemoteStream(remote)
+            setPhase('connected')
+          },
+          onRemoteCapture: () => { void captureRef.current() },
+          onPeerConnected: () => setPhase('connected'),
+          onPeerDisconnected: () => {
+            setRemoteStream(null)
+            setPhase('starting')
+            setError('Your partner disconnected. Waiting for them to return…')
+          },
+          onError: (msg) => setError(msg),
+        }
+
+        // Try host first. If ID is taken, the other side is already host —
+        // fall back to guest.
+        try {
+          sessionRef.current = await startHost(roomCode, stream, handlers)
+          if (DEV) console.info('[live] started as host', roomCode)
+        } catch (err) {
+          if (DEV) console.info('[live] host failed, trying guest', err)
+          sessionRef.current = await joinRoom(roomCode, stream, handlers)
+          if (DEV) console.info('[live] joined as guest', roomCode)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Could not start live session')
+          setPhase('error')
+        }
       }
-      setRemoteStream(stream)
-      setPeerName('Partner')
-      setPhase('connected')
-    },
-    onRemoteCapture: () => {
-      void captureRef.current()
-    },
-    onPeerConnected: () => setPhase('connected'),
-    onPeerDisconnected: () => {
-      setPeerName(null)
-      setRemoteStream(null)
-      setPhase('pick')
-      setError('Your partner disconnected.')
-    },
-    onError: (msg) => setError(msg),
-  }
-
-  const host = async () => {
-    setBusy(true)
-    setError(null)
-    try {
-      const stream = await requestLocalStream()
-      const session = await startHost(stream, handlers)
-      sessionRef.current = session
-      setRoomCode(session.roomCode)
-      setPhase('showing-code')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start the room.')
-      setPhase('pick')
-    } finally {
-      setBusy(false)
     }
-  }
 
-  const join = async () => {
-    if (!joinCode.trim()) {
-      setError('Enter a room code first.')
-      return
+    void start()
+
+    return () => {
+      cancelled = true
+      cleanup()
     }
-    setBusy(true)
-    setError(null)
-    // Set phase BEFORE the await — otherwise onRemoteStream may have already
-    // set 'connected' and this would overwrite it back to 'joining',
-    // unmounting the video elements.
-    setPhase('joining')
-    try {
-      const stream = await requestLocalStream()
-      const session = await joinRoom(joinCode.trim(), stream, handlers)
-      sessionRef.current = session
-      setRoomCode(joinCode.trim())
-      // Do NOT call setPhase here. onRemoteStream → 'connected'.
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not join that room.')
-      setPhase('pick')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const trigger = () => {
-    sessionRef.current?.triggerCapture()
-    void captureRef.current()
-  }
-
-  const endLive = () => {
-    cleanup()
-    setPhase('pick')
-    setRoomCode('')
-    setRemoteStream(null)
-    setShots([])
-    setCaptures([])
-  }
+  }, [roomCode])
 
   const finish = () => {
     if (captures.length) onComplete(captures)
@@ -234,7 +172,7 @@ export function LiveStage({ targetCount, onComplete, onCancel }: Props) {
   const close = () => {
     captures.forEach((c) => URL.revokeObjectURL(c.url))
     shots.forEach((c) => URL.revokeObjectURL(c.url))
-    endLive()
+    cleanup()
     onCancel()
   }
 
@@ -246,143 +184,75 @@ export function LiveStage({ targetCount, onComplete, onCancel }: Props) {
         </div>
       )}
 
-      {phase === 'pick' && (
-        <div className="space-y-3">
-          <div className="rounded-card border border-line bg-cream p-4">
-            <p className="label">Live split</p>
-            <p className="text-sm text-muted">
-              You'll see each other side by side. Video flows directly between
-              your devices — nothing is stored on a server.
-            </p>
-          </div>
+      <div className="text-center text-xs text-muted">
+        Room: <span className="font-mono">{roomCode}</span> ·{' '}
+        {phase === 'connected' ? 'Connected' : 'Waiting for your partner…'}
+      </div>
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button onClick={() => void host()} loading={busy}>
-              Create room
-            </Button>
-            <div className="flex gap-2">
-              <input
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value)}
-                placeholder="nh-ABC123"
-                className="flex-1 rounded-field border border-line bg-surface px-3 py-2 font-mono text-sm outline-none focus:border-accent"
-              />
-              <Button
-                variant="outline"
-                onClick={() => void join()}
-                loading={busy}
-              >
-                Join
-              </Button>
-            </div>
-          </div>
-
-          <Button variant="ghost" className="w-full" onClick={close}>
-            Cancel
-          </Button>
+      <div className="relative grid grid-cols-2 gap-2">
+        <div className="relative aspect-square overflow-hidden rounded-field bg-black">
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="h-full w-full scale-x-[-1] object-cover"
+          />
+          <span className="absolute bottom-1 left-2 font-sans text-[10px] font-bold uppercase tracking-[0.14em] text-white/80">
+            You
+          </span>
         </div>
-      )}
-
-      {(phase === 'showing-code' || phase === 'creating') && (
-        <div className="space-y-3 text-center">
-          <p className="label">Share this code with your partner</p>
-          <p className="font-mono text-3xl font-bold tracking-[0.2em] text-rose">
-            {roomCode}
-          </p>
-          <p className="text-xs text-muted">Waiting for them to join…</p>
-          <Button variant="ghost" onClick={endLive}>
-            Cancel
-          </Button>
-        </div>
-      )}
-
-      {phase === 'joining' && (
-        <div className="space-y-3 text-center">
-          <p className="label">Connecting…</p>
-          <p className="text-xs text-muted">Calling room {roomCode}</p>
-          <Button variant="ghost" onClick={endLive}>
-            Cancel
-          </Button>
-        </div>
-      )}
-
-      {phase === 'connected' && (
-        <>
-          <div className="relative grid grid-cols-2 gap-2">
-            <div className="relative aspect-square overflow-hidden rounded-field bg-black">
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className="h-full w-full scale-x-[-1] object-cover"
-              />
-              <span className="absolute bottom-1 left-2 font-sans text-[10px] font-bold uppercase tracking-[0.14em] text-white/80">
-                You
-              </span>
-            </div>
-            <div className="relative aspect-square overflow-hidden rounded-field bg-black">
-              <video
-                ref={remoteVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className="h-full w-full object-cover"
-              />
-              <span className="absolute bottom-1 left-2 font-sans text-[10px] font-bold uppercase tracking-[0.14em] text-white/80">
-                {peerName ?? 'Partner'}
-              </span>
-              {!remoteStream && (
-                <div className="absolute inset-0 grid place-items-center bg-black/60 text-center text-[10px] text-white/80">
-                  Waiting for partner's camera…
-                </div>
-              )}
-            </div>
-
-            {countdown !== null && (
-              <div className="absolute inset-0 grid place-items-center bg-black/40">
-                <span className="font-sans text-8xl font-bold text-white">
-                  {countdown}
-                </span>
-              </div>
-            )}
-            {flash && <div className="animate-flash absolute inset-0 bg-white" />}
-          </div>
-
-          {shots.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {shots.map((s) => (
-                <img
-                  key={s.url}
-                  src={s.url}
-                  alt=""
-                  className="h-16 w-16 shrink-0 rounded-field object-cover ring-1 ring-line"
-                />
-              ))}
+        <div className="relative aspect-square overflow-hidden rounded-field bg-black">
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="h-full w-full object-cover"
+          />
+          <span className="absolute bottom-1 left-2 font-sans text-[10px] font-bold uppercase tracking-[0.14em] text-white/80">
+            Partner
+          </span>
+          {!remoteStream && (
+            <div className="absolute inset-0 grid place-items-center bg-black/60 text-center text-[10px] text-white/80">
+              Waiting for partner's camera…
             </div>
           )}
+        </div>
 
-          <div className="flex flex-wrap justify-center gap-2">
-            {captures.length === 0 ? (
-              <Button
-                onClick={trigger}
-                disabled={capturing || !remoteStream}
-              >
-                {capturing ? 'Capturing…' : `Start (${targetCount} shots)`}
-              </Button>
-            ) : (
-              <Button onClick={finish}>Continue to review</Button>
-            )}
-            <Button variant="ghost" onClick={endLive} disabled={capturing}>
-              End live
-            </Button>
+        {countdown !== null && (
+          <div className="absolute inset-0 grid place-items-center bg-black/40">
+            <span className="font-sans text-8xl font-bold text-white">{countdown}</span>
           </div>
+        )}
+        {flash && <div className="animate-flash absolute inset-0 bg-white" />}
+      </div>
 
-          <p className="text-center text-xs text-muted">
-            Both sides see the same countdown, so both capture the same moment.
-          </p>
-        </>
+      {shots.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {shots.map((s) => (
+            <img
+              key={s.url}
+              src={s.url}
+              alt=""
+              className="h-16 w-16 shrink-0 rounded-field object-cover ring-1 ring-line"
+            />
+          ))}
+        </div>
       )}
+
+      <div className="flex flex-wrap justify-center gap-2">
+        {captures.length === 0 ? (
+          <Button onClick={() => void captureRef.current()} disabled={capturing || !remoteStream}>
+            {capturing ? 'Capturing…' : `Start (${targetCount} shots)`}
+          </Button>
+        ) : (
+          <Button onClick={finish}>Continue to review</Button>
+        )}
+        <Button variant="ghost" onClick={close} disabled={capturing}>
+          Cancel
+        </Button>
+      </div>
     </div>
   )
 }

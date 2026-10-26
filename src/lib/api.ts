@@ -45,6 +45,15 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   })
   return handle<T>(res, `POST ${path}`)
 }
+export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  })
+  return handle<T>(res, `PATCH ${path}`)
+}
 
 export async function apiPostNoContent(
   path: string,
@@ -70,6 +79,8 @@ export async function apiPostNoContent(
 }
 
 export type BackendHealth = { ok: boolean; db: boolean; time: string }
+
+
 
 export async function pingBackend(): Promise<BackendHealth | null> {
   try {

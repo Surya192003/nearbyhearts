@@ -1,4 +1,4 @@
-import { apiGet } from '@/lib/api'
+import { apiGet, apiPatch, apiPost } from '@/lib/api'
 import type { Couple, InviteCode, Partner } from '@/types'
 
 export const coupleService = {
@@ -11,53 +11,19 @@ export const coupleService = {
     nextVisitAt?: string | null
     distanceKm?: number | null
   }): Promise<Couple> {
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/couple`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(patch),
-      },
-    )
-    if (!res.ok) throw new Error(`Update failed: ${res.status}`)
-    return res.json() as Promise<Couple>
+    return apiPatch<Couple>('/couple', patch)
   },
 
-  /** NEW — generate a 6-char code, valid 7 days. Reuses an active code if one exists. */
+  /** Generate a 6-char invite code, valid 7 days. Reuses an active one if present. */
   async createInvite(): Promise<InviteCode> {
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/couple/invite`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({}),
-      },
-    )
-    if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as { error?: string }
-      throw new Error(err.error ?? `Could not create invite: ${res.status}`)
-    }
-    return res.json() as Promise<InviteCode>
+    return apiPost<InviteCode>('/couple/invite', {})
   },
 
-  /** NEW — join the creator's couple. Returns the new partner. */
+  /** Join an existing couple using an invite code. Returns the new partner. */
   async joinWithCode(code: string): Promise<Partner> {
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/couple/join`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ code }),
-      },
-    )
-    if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as { error?: string }
-      throw new Error(err.error ?? `Could not join: ${res.status}`)
-    }
-    const body = (await res.json()) as { partner: Partner }
-    return body.partner
+    const { partner } = await apiPost<{ partner: Partner }>('/couple/join', {
+      code,
+    })
+    return partner
   },
 }

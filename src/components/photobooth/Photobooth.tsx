@@ -38,7 +38,7 @@ const DEV = import.meta.env.DEV
 export function Photobooth({ variant }: { variant: Variant }) {
   const user = useAuthStore((s) => s.user)
   const [searchParams, setSearchParams] = useSearchParams()
-  const [quota, setQuota] = useState<QuotaInfo>(() => getQuota())
+  const [quota, setQuota] = useState<QuotaInfo>(() => getQuota(user?.id))
   const [mode, setMode] = useState<Mode>('solo')
   const [stripSize, setStripSize] = useState<StripCount>(3)
   const [phase, setPhase] = useState<Phase>('idle')
@@ -49,6 +49,16 @@ export function Photobooth({ variant }: { variant: Variant }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [justUnlocked, setJustUnlocked] = useState(false)
+
+  // Deterministic room id for Live mode — couple id if present, else sorted pair.
+  // Both partners derive the same value.
+  const liveRoomId = useMemo(() => {
+    if (!user) return ''
+    const coupleId = (user as { couple?: { id: string } | null }).couple?.id
+    if (coupleId) return coupleId
+    if (user.partner) return [user.id, user.partner.id].sort().join('-')
+    return ''
+  }, [user])
 
   const reloadGallery = useCallback(async () => {
     try {
@@ -81,21 +91,26 @@ export function Photobooth({ variant }: { variant: Variant }) {
     void reloadGallery()
   }, [reloadGallery])
 
+  // Reload quota whenever the signed-in user changes (login / logout)
+  useEffect(() => {
+    setQuota(getQuota(user?.id))
+  }, [user?.id])
+
   useEffect(() => {
     if (searchParams.get('unlocked') === '1') {
       setJustUnlocked(true)
-      setQuota(getQuota())
+      setQuota(getQuota(user?.id))
       const next = new URLSearchParams(searchParams)
       next.delete('unlocked')
       setSearchParams(next, { replace: true })
       const t = setTimeout(() => setJustUnlocked(false), 5000)
       return () => clearTimeout(t)
     }
-  }, [searchParams, setSearchParams])
+  }, [searchParams, setSearchParams, user?.id])
 
   const start = () => {
     setError(null)
-    const fresh = getQuota()
+    const fresh = getQuota(user?.id)
     setQuota(fresh)
 
     if (fresh.remaining <= 0) {
@@ -111,6 +126,10 @@ export function Photobooth({ variant }: { variant: Variant }) {
     }
     if (mode === 'duo' && !partnerPhotoUrl) {
       setError('Add a partner photo first.')
+      return
+    }
+    if (mode === 'live' && !liveRoomId) {
+      setError('You need a partner to use Live mode.')
       return
     }
     const newSession = uid()
@@ -166,11 +185,16 @@ export function Photobooth({ variant }: { variant: Variant }) {
     if (DEV) console.log('[Photobooth] saving', { sessionId, count: stored.length })
     try {
       await photoboothService.save(stored)
-      consumePhotos(captures.length)
+      const ok = consumePhotos(user?.id, captures.length)
+      if (!ok && DEV) {
+        console.warn(
+          '[Photobooth] consumePhotos returned false — quota was exhausted by another tab',
+        )
+      }
       captures.forEach((c) => URL.revokeObjectURL(c.url))
       setCaptures([])
       setPhase('idle')
-      setQuota(getQuota())
+      setQuota(getQuota(user?.id))
       await reloadGallery()
     } catch (err) {
       if (DEV) console.error('[Photobooth] save error', err)
@@ -333,13 +357,19 @@ export function Photobooth({ variant }: { variant: Variant }) {
           />
         )}
 
-        {phase === 'camera' && mode === 'live' && (
-          <LiveStage
-            targetCount={targetCount}
-            onComplete={complete}
-            onCancel={cancel}
-          />
-        )}
+        {phase === 'camera' && mode === 'live' &&
+          (liveRoomId ? (
+            <LiveStage
+              coupleId={liveRoomId}
+              targetCount={targetCount}
+              onComplete={complete}
+              onCancel={cancel}
+            />
+          ) : (
+            <div className="rounded-field border border-rose/40 bg-rose-soft px-3 py-2 text-xs text-rose-strong">
+              You need a partner to use Live mode.
+            </div>
+          ))}
 
         {phase === 'review' && (
           <PhotoStrip

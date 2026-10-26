@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { authService } from '@/services/authService'
 import type { SignInPayload, SignUpPayload, User } from '@/types'
 
+
 type Status = 'idle' | 'loading' | 'authenticated' | 'anonymous'
 
 type State = {

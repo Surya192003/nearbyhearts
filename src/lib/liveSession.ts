@@ -45,15 +45,6 @@ function isCaptureMessage(data: unknown): boolean {
   )
 }
 
-function generateRoomCode(): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  let s = 'nh-'
-  for (let i = 0; i < 6; i += 1) {
-    s += alphabet[Math.floor(Math.random() * alphabet.length)]
-  }
-  return s
-}
-
 function waitOpen(peer: Peer): Promise<void> {
   return new Promise((resolve, reject) => {
     peer.once('open', () => resolve())
@@ -72,11 +63,11 @@ function isTransientError(msg: string): boolean {
 }
 
 export async function startHost(
+  roomCode: string,
   localStream: MediaStream,
   handlers: LiveHandlers,
 ): Promise<LiveSession> {
-  const code = generateRoomCode()
-  const peer = new Peer(code, PEER_CONFIG)
+  const peer = new Peer(roomCode, PEER_CONFIG)
 
   try {
     await waitOpen(peer)
@@ -92,15 +83,14 @@ export async function startHost(
   peer.on('call', (call) => {
     mediaConn = call
 
-    // Register listeners BEFORE answer(), so no event can arrive unwatched.
     call.on('stream', (remote) => {
       if (import.meta.env.DEV) {
         console.info(
           '[live:host] remote stream received',
           remote.getVideoTracks().length,
-          'video track(s),',
+          'video',
           remote.getAudioTracks().length,
-          'audio track(s)',
+          'audio',
         )
       }
       handlers.onRemoteStream(remote)
@@ -131,7 +121,7 @@ export async function startHost(
   })
 
   return {
-    roomCode: code,
+    roomCode,
     stop: () => {
       mediaConn?.close()
       dataConn?.close()
@@ -144,11 +134,11 @@ export async function startHost(
 }
 
 export async function joinRoom(
-  hostCode: string,
+  roomCode: string,
   localStream: MediaStream,
   handlers: LiveHandlers,
 ): Promise<LiveSession> {
-  const myId = `nh-guest-${Math.random().toString(36).slice(2, 10)}`
+  const myId = `${roomCode}-guest-${Math.random().toString(36).slice(2, 8)}`
   const peer = new Peer(myId, PEER_CONFIG)
 
   try {
@@ -158,21 +148,20 @@ export async function joinRoom(
     throw err
   }
 
-  const call = peer.call(hostCode, localStream)
+  const call = peer.call(roomCode, localStream)
   if (!call) {
     peer.destroy()
-    throw new Error('Could not reach the other side. Check the room code.')
+    throw new Error('Could not reach the other side.')
   }
 
-  // Attach listener BEFORE any await, so the stream event can't slip past.
   call.on('stream', (remote) => {
     if (import.meta.env.DEV) {
       console.info(
         '[live:guest] remote stream received',
         remote.getVideoTracks().length,
-        'video track(s),',
+        'video',
         remote.getAudioTracks().length,
-        'audio track(s)',
+        'audio',
       )
     }
     handlers.onRemoteStream(remote)
@@ -181,7 +170,7 @@ export async function joinRoom(
   call.on('close', () => handlers.onPeerDisconnected?.())
   call.on('error', (err) => handlers.onError(err.message))
 
-  const dataConn = peer.connect(hostCode)
+  const dataConn = peer.connect(roomCode)
   await new Promise<void>((resolve, reject) => {
     dataConn.once('open', () => resolve())
     dataConn.once('error', (err) =>
@@ -195,7 +184,7 @@ export async function joinRoom(
   dataConn.on('error', (err) => handlers.onError(err.message))
 
   return {
-    roomCode: hostCode,
+    roomCode,
     stop: () => {
       call.close()
       dataConn.close()
@@ -205,4 +194,10 @@ export async function joinRoom(
       dataConn.send(CAPTURE_MSG)
     },
   }
+}
+
+export function coupleRoomCode(coupleId: string): string {
+  // Deterministic 8-char prefix from the couple UUID.
+  // Both partners derive the same code, so no sharing needed.
+  return `nh-${coupleId.replace(/-/g, '').slice(0, 10).toLowerCase()}`
 }
